@@ -185,9 +185,9 @@ class Graph(object):
         assert np.asarray(self.get_output(loss_node)).ndim == 0
 
         "*** YOUR CODE HERE ***"
-        rnodes = self.nodes[:]
+        rnodes = self.nodes[:] #nodes reversed
         rnodes.reverse()
-        self.gradAccums[nodes[0]] = np.ones_like(self.gradAccums[nodes[0]])
+        self.gradAccums[rnodes[0]] = np.ones_like(self.gradAccums[rnodes[0]])
         for node in rnodes:
             back = node.backward(self.get_inputs(node), self.get_gradient(node))
             parents = node.get_parents()
