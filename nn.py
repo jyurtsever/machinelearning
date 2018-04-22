@@ -81,7 +81,14 @@ class Graph(object):
         so don't forget to call `self.add` on each of the variables.
         """
         "*** YOUR CODE HERE ***"
-
+        self.inputs = {}
+        self.outputs = {}
+        self.gradAccums = {}
+        self.nodes = []
+        self.vars = variables
+        addedInds = []
+        for var in variables:
+            self.add(var)
     def get_nodes(self):
         """
         TODO: Question 3 - [Neural Network] Computation Graph
@@ -93,6 +100,7 @@ class Graph(object):
         Returns: a list of nodes
         """
         "*** YOUR CODE HERE ***"
+        return self.nodes
 
     def get_inputs(self, node):
         """
@@ -106,6 +114,7 @@ class Graph(object):
         Hint: every node has a `.get_parents()` method
         """
         "*** YOUR CODE HERE ***"
+        return self.inputs[node]
 
     def get_output(self, node):
         """
@@ -117,6 +126,7 @@ class Graph(object):
         Returns: a numpy array or a scalar
         """
         "*** YOUR CODE HERE ***"
+        return self.outputs[node]
 
     def get_gradient(self, node):
         """
@@ -134,6 +144,7 @@ class Graph(object):
         Returns: a numpy array
         """
         "*** YOUR CODE HERE ***"
+        return self.gradAccums[node]
 
     def add(self, node):
         """
@@ -150,7 +161,12 @@ class Graph(object):
         accumulator for the node, with correct shape.
         """
         "*** YOUR CODE HERE ***"
-
+        self.nodes.append(node)
+        parents = node.get_parents()
+        self.inputs[node] = [self.get_output(p) for p in parents]
+        outp = node.forward(self.inputs[node])
+        self.outputs[node] = outp
+        self.gradAccums[node] = np.zeros_like(outp)
     def backprop(self):
         """
         TODO: Question 3 - [Neural Network] Computation Graph
@@ -169,6 +185,14 @@ class Graph(object):
         assert np.asarray(self.get_output(loss_node)).ndim == 0
 
         "*** YOUR CODE HERE ***"
+        nodes = self.nodes[:]
+        nodes.reverse()
+        self.gradAccums[nodes[0]] = np.ones_like(self.gradAccums[nodes[0]])
+        for node in nodes:
+            back = node.backward(self.get_inputs(node), self.get_gradient(node))
+            parents = node.get_parents()
+            for i in range(len(parents)):
+                self.gradAccums[parents[i]] = self.gradAccums[parents[i]] + back[i]
 
     def step(self, step_size):
         """
@@ -181,7 +205,8 @@ class Graph(object):
         Hint: each Variable has a `.data` attribute
         """
         "*** YOUR CODE HERE ***"
-
+        for node in self.vars:
+            node.data = node.data - self.gradAccums[node]*step_size
 
 class DataNode(object):
     """
