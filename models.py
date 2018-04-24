@@ -52,6 +52,15 @@ class RegressionModel(Model):
         self.b1 = nn.Variable(40)  #b
         self.b2 = nn.Variable(1)
 
+    def execute_layer(self, x, y, graph):
+        input_x = nn.Input(graph, x)
+        xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
+        xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
+        relu = nn.ReLU(graph, xw1_plus_b1)
+        relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
+        relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
+        return graph, relu_w2_plus_b2
+
     def run(self, x, y=None):
 
         """
@@ -95,14 +104,7 @@ class RegressionModel(Model):
             graph, m = self.execute_layer(x,y,graph)
             return graph.get_output(m)
 
-    def execute_layer(self, x, y, graph):
-        input_x = nn.Input(graph, x)
-        xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
-        xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
-        relu = nn.ReLU(graph, xw1_plus_b1)
-        relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
-        relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
-        return graph, relu_w2_plus_b2
+
 
 
 class OddRegressionModel(Model):
@@ -125,35 +127,18 @@ class OddRegressionModel(Model):
         # You may use any learning rate that works well for your architecture
         "*** YOUR CODE HERE ***"
         self.learning_rate = 0.01
-        self.w1 = nn.Variable(1,40) #m
-        self.w2 = nn.Variable(40,1)
-        self.b1 = nn.Variable(40)  #b
+        self.w1 = nn.Variable(1,10) #m
+        self.w2 = nn.Variable(10,1)
+        self.b1 = nn.Variable(10)  #b
         self.b2 = nn.Variable(1)
 
-    def execute_layer(self, x, y, graph):
-        input_x = nn.Input(graph, x)
+    def execute_layer(self, input_x, y, graph):
         xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
         xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
         relu = nn.ReLU(graph, xw1_plus_b1)
         relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
         relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
-        m = relu_w2_plus_b2
-
-        inv = self.execute_negative(x,y,graph)
-        return graph, m, inv
-
-    def execute_negative(self, x, y, graph):
-        print("X SHAPE: ", x.shape)
-        x = np.dot(x, np.array([-1]))
-        x = np.reshape(x, (16,1))
-        print("X SHAPE: ", x.shape)
-        input_x = nn.Input(graph, x)
-        xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
-        xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
-        relu = nn.ReLU(graph, xw1_plus_b1)
-        relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
-        relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
-        return relu_w2_plus_b2
+        return graph, relu_w2_plus_b2
 
     def run(self, x, y=None):
         """
@@ -186,20 +171,46 @@ class OddRegressionModel(Model):
             "*** YOUR CODE HERE ***"
             graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
             input_y = nn.Input(graph, y)
-            inv_input_y = nn.Input(graph, np.dot(y, np.array([-1])))
-            graph, m, inv = self.execute_layer(x, y, graph)
-            loss = nn.SquareLoss(graph, m, input_y)
-            loss = nn.SquareLoss(graph, inv, inv_input_y)
+            input_x = nn.Input(graph, x)
+
+            # initialize -x
+            inv = nn.Input(graph, np.array([[-1.0]]))
+            inv_input_x = nn.MatrixMultiply(graph, input_x, inv)
+
+            # calculate g(x)
+            graph, m = self.execute_layer(input_x, y, graph)
+
+            # calculate -g(-x)
+            graph, inv_m = self.execute_layer(inv_input_x, y, graph)
+            inv_m = nn.MatrixMultiply(graph, inv_m, inv)
+
+            # f(x) = g(x) - g(-x)
+            odd = nn.MatrixVectorAdd(graph, m, inv_m)
+
+            loss = nn.SquareLoss(graph, odd, input_y)
             return graph
         else:
             # At test time, the correct output is unknown.
             # You should instead return your model's prediction as a numpy array
             "*** YOUR CODE HERE ***"
             graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
-            graph, m, inv = self.execute_layer(x,y,graph)
-            inv_m = np.dot(x, np.array([-1]))
-            inv_m = nn.Input(graph, inv_m)
-            return graph.get_output(m) - graph.get_output(inv_m)
+            input_x = nn.Input(graph, x)
+
+            # initialize -x
+            inv = nn.Input(graph, np.array([[-1.0]]))
+            inv_input_x = nn.MatrixMultiply(graph, input_x, inv)
+
+            # calculate g(x)
+            graph, m = self.execute_layer(input_x, y, graph)
+
+            # calculate -g(-x)
+            graph, inv_m = self.execute_layer(inv_input_x, y, graph)
+            inv_m = nn.MatrixMultiply(graph, inv_m, inv)
+
+            # f(x) = g(x) - g(-x)
+            odd = nn.MatrixVectorAdd(graph, m, inv_m)
+
+            return graph.get_output(odd)
 
 
 class DigitClassificationModel(Model):
@@ -226,6 +237,22 @@ class DigitClassificationModel(Model):
         # Remember to set self.learning_rate!
         # You may use any learning rate that works well for your architecture
         "*** YOUR CODE HERE ***"
+        h = 120
+        self.learning_rate = 0.6
+
+        self.w1 = nn.Variable(784,h) #m
+        self.w2 = nn.Variable(h,10)
+        self.b1 = nn.Variable(h)  #b
+        self.b2 = nn.Variable(10)
+
+    def execute_layer(self, x, y, graph):
+        input_x = nn.Input(graph, x)
+        xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
+        xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
+        relu = nn.ReLU(graph, xw1_plus_b1)
+        relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
+        relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
+        return graph, relu_w2_plus_b2
 
     def run(self, x, y=None):
         """
@@ -255,8 +282,16 @@ class DigitClassificationModel(Model):
 
         if y is not None:
             "*** YOUR CODE HERE ***"
+            graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
+            input_y = nn.Input(graph, y)
+            graph, m = self.execute_layer(x, y, graph)
+            loss = nn.SoftmaxLoss(graph, m, input_y)
+            return graph
         else:
             "*** YOUR CODE HERE ***"
+            graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
+            graph, m = self.execute_layer(x, y, graph)
+            return graph.get_output(m)
 
 
 class DeepQModel(Model):
