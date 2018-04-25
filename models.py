@@ -315,6 +315,22 @@ class DeepQModel(Model):
         # Remember to set self.learning_rate!
         # You may use any learning rate that works well for your architecture
         "*** YOUR CODE HERE ***"
+        h = 10
+        self.learning_rate = 0.01
+
+        self.w1 = nn.Variable(4,h) #m
+        self.w2 = nn.Variable(h,2)
+        self.b1 = nn.Variable(h)  #b
+        self.b2 = nn.Variable(2)
+
+    def execute_layer(self, x, y, graph):
+        input_x = nn.Input(graph, x)
+        xw1 = nn.MatrixMultiply(graph, input_x, self.w1)
+        xw1_plus_b1 = nn.MatrixVectorAdd(graph, xw1, self.b1)
+        relu = nn.ReLU(graph, xw1_plus_b1)
+        relu_w2 = nn.MatrixMultiply(graph, relu, self.w2)
+        relu_w2_plus_b2 = nn.MatrixVectorAdd(graph, relu_w2, self.b2)
+        return graph, relu_w2_plus_b2
 
     def run(self, states, Q_target=None):
         """
@@ -347,8 +363,16 @@ class DeepQModel(Model):
 
         if Q_target is not None:
             "*** YOUR CODE HERE ***"
+            graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
+            input_y = nn.Input(graph, Q_target)
+            graph, m = self.execute_layer(states, Q_target, graph)
+            loss = nn.SquareLoss(graph, m, input_y)
+            return graph
         else:
             "*** YOUR CODE HERE ***"
+            graph = nn.Graph([self.w1, self.w2, self.b1, self.b2])
+            graph, m = self.execute_layer(states, Q_target, graph)
+            return graph.get_output(m)
 
     def get_action(self, state, eps):
         """
