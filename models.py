@@ -416,6 +416,13 @@ class LanguageIDModel(Model):
         # Remember to set self.learning_rate!
         # You may use any learning rate that works well for your architecture
         "*** YOUR CODE HERE ***"
+        self.learning_rate = .03
+        self.d = 150
+        self.w = nn.Variable(self.num_chars, self.d)
+        self.v = nn.Variable(self.d, self.d)
+        # self.b = nn.Variable(1, self.d)
+        self.t = nn.Variable(self.d, len(self.languages))
+        self.h0 = nn.Variable(1, self.d)
 
     def run(self, xs, y=None):
         """
@@ -459,8 +466,37 @@ class LanguageIDModel(Model):
         batch_size = xs[0].shape[0]
 
         "*** YOUR CODE HERE ***"
+        batch_size = xs[0].shape[0]
+        graph = nn.Graph([self.t, self.w, self.h0, self.v])
+        def f(h, c):
+            if h == None:
+
+                ones = nn.Input(graph, np.ones([batch_size, 1]))
+                in_h = nn.MatrixMultiply(graph, ones, self.h0) #nn.Input(g, np.zeros([batch_size, self.d]))
+            else:
+                in_h = h
+            input_c = nn.Input(graph, c)
+            c_mul_w = nn.MatrixMultiply(graph, input_c, self.w)  # batchsize x d
+            h_mul_v = nn.MatrixMultiply(graph, in_h, self.v)
+            relu1 = nn.ReLU(graph, nn.Add(graph, c_mul_w, h_mul_v))
+            return relu1
 
         if y is not None:
             "*** YOUR CODE HERE ***"
+            h = None
+            for i in range(len(xs)):
+                h = f(h, xs[i])
+
+            input_y = nn.Input(graph, y)
+            in_h = h
+            mul = nn.MatrixMultiply(graph, in_h, self.t)
+            loss = nn.SoftmaxLoss(graph, mul, input_y)
+            return graph
         else:
             "*** YOUR CODE HERE ***"
+            h = None
+            for i in range(len(xs)):
+                h = f(h, xs[i])
+            in_h = h#nn.Input(graph, h)
+            mul = nn.MatrixMultiply(graph, in_h, self.t)
+            return graph.get_output(mul)
